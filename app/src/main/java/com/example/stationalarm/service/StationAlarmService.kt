@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.app.PendingIntent
+import com.example.stationalarm.presentation.MainActivity
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
@@ -83,7 +85,7 @@ class StationAlarmService : Service() {
                 if (distance <= threshold) {
                     vibrate()
                     repository.updateMessage("目的地に接近しました！")
-                    updateNotification("目的地に接近しました！")
+                    updateNotification("目的地に接近しました！", true)
                 }
             }
         }
@@ -117,17 +119,32 @@ class StationAlarmService : Service() {
         }
     }
 
-    private fun createNotification(content: String): Notification {
-        return NotificationCompat.Builder(this, "station_alarm_channel")
+
+
+    private fun updateNotification(content: String, isAlarm: Boolean = false) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(1, createNotification(content, isAlarm))
+    }
+
+    private fun createNotification(content: String, isAlarm: Boolean = false): Notification {
+        val builder = NotificationCompat.Builder(this, "station_alarm_channel")
             .setContentTitle("駅近振動通知")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
-            .build()
-    }
 
-    private fun updateNotification(content: String) {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(1, createNotification(content))
+        if (isAlarm) {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setFullScreenIntent(pendingIntent, true)
+            builder.priority = NotificationCompat.PRIORITY_HIGH
+            builder.setCategory(NotificationCompat.CATEGORY_ALARM)
+        }
+
+        return builder.build()
     }
 }
