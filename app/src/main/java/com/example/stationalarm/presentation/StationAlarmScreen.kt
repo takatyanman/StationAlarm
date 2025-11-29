@@ -33,6 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.wear.compose.foundation.lazy.items
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 
 @Composable
@@ -43,6 +45,7 @@ fun StationAlarmScreen(
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -80,15 +83,25 @@ fun StationAlarmScreen(
                         color = MaterialTheme.colors.primary,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "残り: ${uiState.currentDistance?.let { "${it.toInt()}m" } ?: "計測中..."}",
-                        style = MaterialTheme.typography.title3,
+                        text = "${uiState.currentDistance?.let { "${it.toInt()}m" } ?: "計測中..."}",
+                        style = MaterialTheme.typography.display1,
+                        color = if ((uiState.currentDistance ?: Float.MAX_VALUE) <= uiState.distanceThreshold) MaterialTheme.colors.error else MaterialTheme.colors.primary,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "残り距離",
+                        style = MaterialTheme.typography.caption1,
+                        color = androidx.compose.ui.graphics.Color.Gray,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
-                        onClick = { viewModel.stopTracking() },
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.stopTracking() 
+                        },
                         colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error)
                     ) {
                         Text("停止")
@@ -122,7 +135,10 @@ fun StationAlarmScreen(
                         uiState.history.forEach { station ->
                             androidx.wear.compose.material.Chip(
                                 label = { Text(station) },
-                                onClick = { viewModel.updateStationNameInput(station) },
+                                onClick = { 
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.updateStationNameInput(station) 
+                                },
                                 colors = androidx.wear.compose.material.ChipDefaults.secondaryChipColors(),
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                             )
@@ -136,18 +152,27 @@ fun StationAlarmScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Button(
-                            onClick = { viewModel.updateDistanceThreshold(uiState.distanceThreshold - 100) },
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.updateDistanceThreshold(uiState.distanceThreshold - 100) 
+                            },
                             modifier = Modifier.size(40.dp)
                         ) { Text("-") }
                         Spacer(modifier = Modifier.size(8.dp))
                         Button(
-                            onClick = { viewModel.updateDistanceThreshold(uiState.distanceThreshold + 100) },
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.updateDistanceThreshold(uiState.distanceThreshold + 100) 
+                            },
                             modifier = Modifier.size(40.dp)
                         ) { Text("+") }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
-                        onClick = { viewModel.startTracking() },
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.startTracking() 
+                        },
                         enabled = uiState.stationNameInput.isNotBlank()
                     ) {
                         Text("開始")
