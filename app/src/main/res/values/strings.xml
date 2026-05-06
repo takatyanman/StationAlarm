@@ -28,4 +28,8 @@
     <string name="ui_monitoring_station">監視中: %s</string>
     <string name="ui_arrived">到着しました</string>
     <string name="ui_service_starting">サービスを起動中...</string>
+
+    <!-- Tile (クイック起動) -->
+    <string name="tile_label">駅近クイック起動</string>
+    <string name="tile_title">クイック起動</string>
 </resources>

@@ -66,6 +66,14 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
+    // Wear OS Tiles + ProtoLayout (クイック起動タイル)
+    implementation("androidx.wear.tiles:tiles:1.4.0")
+    implementation("androidx.wear.tiles:tiles-material:1.4.0")
+    implementation("androidx.wear.protolayout:protolayout:1.2.0")
+    implementation("androidx.wear.protolayout:protolayout-material:1.2.0")
+    implementation("androidx.wear.protolayout:protolayout-expression:1.2.0")
+    implementation("com.google.guava:guava:31.1-android")
+
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")

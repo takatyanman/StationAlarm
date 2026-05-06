@@ -51,6 +51,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(distanceThreshold = newDistance)
     }
 
+    /**
+     * タイルなど外部トリガーから、駅名としきい値を指定して即追跡開始する。
+     * 既に追跡中の場合は何もしない（重複起動を避ける）。
+     */
+    fun startTrackingFor(stationName: String, threshold: Int) {
+        if (_uiState.value.isTracking) return
+        _uiState.value = _uiState.value.copy(
+            stationNameInput = stationName,
+            distanceThreshold = threshold.coerceIn(100, 2000)
+        )
+        startTracking()
+    }
+
     fun startTracking() {
         if (_uiState.value.stationNameInput.isBlank()) return
         

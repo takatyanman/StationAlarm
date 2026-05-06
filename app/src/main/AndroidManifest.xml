@@ -26,6 +26,16 @@
             android:name=".service.StationAlarmService"
             android:foregroundServiceType="location" />
 
+        <service
+            android:name=".tile.StationQuickStartTileService"
+            android:exported="true"
+            android:label="@string/tile_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
