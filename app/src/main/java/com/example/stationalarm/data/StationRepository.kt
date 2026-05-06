@@ -70,10 +70,15 @@ class StationRepository private constructor(context: Context) {
     fun updateIsTracking(isTracking: Boolean) {
         _trackingState.value = _trackingState.value.copy(isTracking = isTracking)
     }
+    
+    fun updateStationName(stationName: String?) {
+        _trackingState.value = _trackingState.value.copy(stationName = stationName)
+    }
 
     data class TrackingState(
         val isTracking: Boolean = false,
         val currentDistance: Float? = null,
-        val message: String = ""
+        val message: String = "",
+        val stationName: String? = null
     )
 }

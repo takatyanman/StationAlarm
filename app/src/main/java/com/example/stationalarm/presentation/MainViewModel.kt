@@ -1,18 +1,12 @@
 package com.example.stationalarm.presentation
 
 import android.app.Application
-import android.content.Context
 import android.location.Geocoder
 import android.location.Location
 import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.stationalarm.LocationManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +22,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = com.example.stationalarm.data.StationRepository.getInstance(application)
     private val geocoder = Geocoder(application, Locale.JAPAN)
     
-    // Tracking state from Repository
     init {
         viewModelScope.launch {
             launch {
@@ -41,7 +34,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(
                         isTracking = state.isTracking,
                         currentDistance = state.currentDistance,
-                        message = state.message
+                        message = state.message,
+                        stationName = state.stationName ?: _uiState.value.stationName
                     )
                 }
             }
@@ -66,21 +60,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val location = searchStation(_uiState.value.stationNameInput)
                 if (location != null) {
+                    // 検索成功。即座に画面を切り替える
+                    _uiState.value = _uiState.value.copy(
+                        isTracking = true,
+                        stationName = _uiState.value.stationNameInput,
+                        message = "追跡を開始しています..."
+                    )
+                    
                     repository.addStation(_uiState.value.stationNameInput)
                     startService(location, _uiState.value.stationNameInput)
                 } else {
-                    _uiState.value = _uiState.value.copy(message = "駅が見つかりませんでした")
+                    _uiState.value = _uiState.value.copy(message = "駅が見つかりませんでした。駅名を正しく入力してください。")
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(message = "エラー: ${e.localizedMessage}")
+                e.printStackTrace()
+                _uiState.value = _uiState.value.copy(message = "エラーが発生しました: ${e.message}")
             }
         }
     }
 
     fun stopTracking() {
         val intent = android.content.Intent(getApplication(), com.example.stationalarm.service.StationAlarmService::class.java)
-        intent.action = "STOP_SERVICE"
+        intent.action = com.example.stationalarm.service.StationAlarmService.ACTION_STOP_SERVICE
         getApplication<Application>().startService(intent)
+        
+        // 即座にUIを戻す
+        _uiState.value = _uiState.value.copy(
+            isTracking = false,
+            currentDistance = null,
+            message = ""
+        )
     }
 
     private fun startService(target: Location, stationName: String) {
