@@ -9,15 +9,12 @@ import androidx.wear.protolayout.LayoutElementBuilders
 import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
-import androidx.wear.protolayout.material.Chip
 import androidx.wear.protolayout.material.ChipColors
-import androidx.wear.protolayout.material.Text
-import androidx.wear.protolayout.material.Typography
+import androidx.wear.protolayout.material.CompactChip
 import androidx.wear.protolayout.material.layouts.PrimaryLayout
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
-import com.example.stationalarm.R
 import com.example.stationalarm.presentation.MainActivity
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -72,23 +69,16 @@ class StationQuickStartTileService : TileService() {
                 )
             }
             content.addContent(
-                Chip.Builder(this, buildLaunchAction(station), deviceParameters)
-                    .setPrimaryLabelContent(station)
+                CompactChip.Builder(this, station, buildLaunchAction(station), deviceParameters)
                     .setChipColors(
                         ChipColors(argb(COLOR_JR_GREEN), argb(COLOR_ON_PRIMARY))
                     )
-                    .setWidth(expand())
                     .build()
             )
         }
 
+        // 円形タイル領域に3チップを収めるためタイトルラベルは省略する
         return PrimaryLayout.Builder(deviceParameters)
-            .setPrimaryLabelTextContent(
-                Text.Builder(this, getString(R.string.tile_title))
-                    .setTypography(Typography.TYPOGRAPHY_CAPTION1)
-                    .setColor(argb(COLOR_LABEL))
-                    .build()
-            )
             .setContent(content.build())
             .build()
     }
@@ -127,11 +117,10 @@ class StationQuickStartTileService : TileService() {
         // タイルキャッシュの有効期間 (1時間)
         private const val FRESHNESS_INTERVAL_MS = 60L * 60L * 1000L
 
-        private const val SPACING_DP = 4f
+        private const val SPACING_DP = 2f
 
         // 色 (Theme.kt の JR グリーンに対応)
         private const val COLOR_JR_GREEN = 0xFF00A651.toInt()
         private const val COLOR_ON_PRIMARY = 0xFFFFFFFF.toInt()
-        private const val COLOR_LABEL = 0xFFB0B0B0.toInt()
     }
 }
