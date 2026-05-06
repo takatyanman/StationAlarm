@@ -221,6 +221,8 @@ fun SetupScreen(
                         )
                     },
                     colors = androidx.compose.material.TextFieldDefaults.textFieldColors(
+                        textColor = MaterialTheme.colors.onSurface,
+                        cursorColor = MaterialTheme.colors.primary,
                         backgroundColor = androidx.compose.ui.graphics.Color.Transparent,
                         focusedIndicatorColor = MaterialTheme.colors.primary,
                         unfocusedIndicatorColor = MaterialTheme.colors.onSurfaceVariant
