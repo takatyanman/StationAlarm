@@ -22,7 +22,7 @@ import com.google.common.util.concurrent.ListenableFuture
 /**
  * 駅近クイック起動タイル
  *
- * Wear OS のタイルから固定5駅 (西千葉 / お茶の水 / 代々木 / 新宿 / 錦糸町) のいずれかをタップすると、
+ * Wear OS のタイルから固定5駅 (西千葉 / 錦糸町 / 御茶ノ水 / 代々木 / 新宿) のいずれかをタップすると、
  * その駅名と固定しきい値 (500m) で MainActivity を起動して即追跡を開始する。
  *
  * 駅名は Intent extras (EXTRA_QUICK_STATION) で MainActivity に渡される。
@@ -110,7 +110,7 @@ class StationQuickStartTileService : TileService() {
         const val EXTRA_QUICK_STATION = "quick_station_name"
 
         // タイル経由で起動する場合の固定5駅と固定しきい値
-        val QUICK_STATIONS = listOf("西千葉", "お茶の水", "代々木", "新宿", "錦糸町")
+        val QUICK_STATIONS = listOf("西千葉", "錦糸町", "御茶ノ水", "代々木", "新宿")
         const val QUICK_THRESHOLD = 500
 
         private const val RESOURCES_VERSION = "1"
