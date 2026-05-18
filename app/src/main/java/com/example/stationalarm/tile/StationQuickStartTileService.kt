@@ -22,7 +22,7 @@ import com.google.common.util.concurrent.ListenableFuture
 /**
  * 駅近クイック起動タイル
  *
- * Wear OS のタイルから固定3駅 (西千葉 / お茶の水 / 代々木) のいずれかをタップすると、
+ * Wear OS のタイルから固定5駅 (西千葉 / 錦糸町 / 御茶ノ水 / 代々木 / 新宿) のいずれかをタップすると、
  * その駅名と固定しきい値 (500m) で MainActivity を起動して即追跡を開始する。
  *
  * 駅名は Intent extras (EXTRA_QUICK_STATION) で MainActivity に渡される。
@@ -109,15 +109,15 @@ class StationQuickStartTileService : TileService() {
         // MainActivity に駅名を渡すための Intent extras キー
         const val EXTRA_QUICK_STATION = "quick_station_name"
 
-        // タイル経由で起動する場合の固定3駅と固定しきい値
-        val QUICK_STATIONS = listOf("西千葉", "お茶の水", "代々木")
+        // タイル経由で起動する場合の固定5駅と固定しきい値
+        val QUICK_STATIONS = listOf("西千葉", "錦糸町", "御茶ノ水", "代々木", "新宿")
         const val QUICK_THRESHOLD = 500
 
         private const val RESOURCES_VERSION = "1"
         // タイルキャッシュの有効期間 (1時間)
         private const val FRESHNESS_INTERVAL_MS = 60L * 60L * 1000L
 
-        private const val SPACING_DP = 2f
+        private const val SPACING_DP = 1f
 
         // 色 (Theme.kt の JR グリーンに対応)
         private const val COLOR_JR_GREEN = 0xFF00A651.toInt()
