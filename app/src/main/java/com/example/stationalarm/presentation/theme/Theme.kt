@@ -61,11 +61,38 @@ fun StationAlarmTheme(
  * @param threshold 閾値距離 (メートル)
  */
 fun getDistanceColor(distance: Float, threshold: Int): Color {
-    val ratio = distance / threshold
-    return when {
-        ratio > 2.0f -> DistanceFar        // 閾値の2倍以上: 青
-        ratio > 1.0f -> DistanceMedium     // 閾値以上: 緑
-        ratio > 0.5f -> DistanceNear       // 閾値の半分以上: オレンジ
-        else -> DistanceVeryNear           // 閾値の半分以下: 赤
+    return when (getDistanceBand(distance, threshold)) {
+        DistanceBand.FAR -> DistanceFar
+        DistanceBand.MEDIUM -> DistanceMedium
+        DistanceBand.NEAR -> DistanceNear
+        DistanceBand.VERY_NEAR -> DistanceVeryNear
     }
+}
+
+enum class DistanceBand {
+    FAR,
+    MEDIUM,
+    NEAR,
+    VERY_NEAR
+}
+
+/**
+ * 通知距離に対する現在地の距離帯を返す。
+ */
+fun getDistanceBand(distance: Float, threshold: Int): DistanceBand {
+    val ratio = distance / threshold.coerceAtLeast(1)
+    return when {
+        ratio > 2.0f -> DistanceBand.FAR
+        ratio > 1.0f -> DistanceBand.MEDIUM
+        ratio > 0.5f -> DistanceBand.NEAR
+        else -> DistanceBand.VERY_NEAR
+    }
+}
+
+/**
+ * 通知距離の 2 倍を 0%、通知距離到達を 100% とする進捗値を返す。
+ */
+fun calculateArrivalProgress(distance: Float, threshold: Int): Float {
+    val safeThreshold = threshold.coerceAtLeast(1).toFloat()
+    return ((safeThreshold * 2f - distance) / safeThreshold).coerceIn(0f, 1f)
 }

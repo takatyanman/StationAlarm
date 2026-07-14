@@ -1,92 +1,199 @@
 package com.example.stationalarm.presentation
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import com.example.stationalarm.R
 import com.example.stationalarm.presentation.theme.StationAlarmTheme
 import com.example.stationalarm.tile.StationQuickStartTileService
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private lateinit var locationPermissionLauncher: ActivityResultLauncher<Array<String>>
+    private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
+    private var pendingTrackingStart = false
 
+    // FragmentActivity を使用していないため、Fragment 版数に関する誤検出を局所的に抑制する
+    @SuppressLint("InvalidFragmentVersionForActivityResult")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val permissionLauncher = registerForActivityResult(
+        locationPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
-        ) { permissions ->
-            val granted = permissions.entries.all { it.value }
-            if (granted) {
-                // 権限取得直後にタイル経由の保留 Intent があれば処理する
-                consumeQuickStartIntent(intent)
+        ) {
+            if (!pendingTrackingStart) return@registerForActivityResult
+
+            when {
+                hasPreciseLocationPermission() -> requestNotificationPermissionOrStart()
+                hasApproximateLocationPermission() -> viewModel.showMessage(
+                    getString(R.string.ui_permission_precise_required),
+                    isError = true,
+                    requiresAppSettings = !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
+                )
+                else -> viewModel.showMessage(
+                    getString(R.string.ui_permission_location_required),
+                    isError = true,
+                    requiresAppSettings = !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
+                )
             }
+            if (!hasPreciseLocationPermission()) pendingTrackingStart = false
         }
 
-        permissionLauncher.launch(
-            arrayOf(
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
+        notificationPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (!pendingTrackingStart) return@registerForActivityResult
 
-        // 起動時の Intent (タイルから渡された駅名) を処理
-        consumeQuickStartIntent(intent)
+            if (granted) {
+                startTrackingAfterPermissions()
+            } else {
+                pendingTrackingStart = false
+                viewModel.showMessage(
+                    getString(R.string.ui_permission_notifications_required),
+                    isError = true,
+                    requiresAppSettings = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+                )
+            }
+        }
 
         setContent {
             StationAlarmTheme {
-                StationAlarmApp()
+                StationAlarmApp(
+                    viewModel = viewModel,
+                    onStartRequested = ::requestTrackingStart,
+                    onOpenAppSettings = ::openAppSettings
+                )
             }
         }
+
+        // タイルから受け取った駅名は、画面構築後に権限確認付きで処理する
+        consumeQuickStartIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // singleTask 起動時のタイル再タップに対応
         consumeQuickStartIntent(intent)
     }
 
+    private fun requestTrackingStart() {
+        if (viewModel.uiState.value.isTracking || viewModel.uiState.value.isSearching) return
+
+        pendingTrackingStart = true
+        if (hasPreciseLocationPermission()) {
+            requestNotificationPermissionOrStart()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    private fun requestNotificationPermissionOrStart() {
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            startTrackingAfterPermissions()
+        } else {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun startTrackingAfterPermissions() {
+        pendingTrackingStart = false
+        viewModel.startTracking()
+    }
+
+    private fun openAppSettings() {
+        startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", packageName, null)
+            )
+        )
+    }
+
     /**
-     * タイルから渡された駅名 extras を消費して即追跡開始する。
-     * 権限未取得の場合は駅名を入力欄に反映するだけに留め、ユーザーの「開始」操作を待つ。
+     * タイルから渡された駅名を反映し、通常画面と同じ権限確認を通して追跡開始する。
      */
     private fun consumeQuickStartIntent(intent: Intent?) {
         val station = intent?.getStringExtra(StationQuickStartTileService.EXTRA_QUICK_STATION)
             ?: return
-        if (hasLocationPermission()) {
-            viewModel.startTrackingFor(station, StationQuickStartTileService.QUICK_THRESHOLD)
-        } else {
-            // 権限未取得時は入力欄だけ埋め、権限ダイアログ後の再消費を待つ
-            viewModel.updateStationNameInput(station)
-        }
-        // 二重消費防止のため extras をクリア
         intent.removeExtra(StationQuickStartTileService.EXTRA_QUICK_STATION)
+
+        if (viewModel.uiState.value.isTracking || viewModel.uiState.value.isSearching) {
+            viewModel.showMessage(
+                getString(R.string.ui_tracking_already_active),
+                isError = false
+            )
+        } else {
+            viewModel.prepareTrackingFor(station, StationQuickStartTileService.QUICK_THRESHOLD)
+            requestTrackingStart()
+        }
     }
 
-    private fun hasLocationPermission(): Boolean {
+    private fun hasPreciseLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
-            android.Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasApproximateLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
     }
 }
 
 @Composable
-fun StationAlarmApp() {
-    StationAlarmScreen()
+fun StationAlarmApp(
+    viewModel: MainViewModel,
+    onStartRequested: () -> Unit,
+    onOpenAppSettings: () -> Unit
+) {
+    StationAlarmScreen(
+        viewModel = viewModel,
+        onStartRequested = onStartRequested,
+        onOpenAppSettings = onOpenAppSettings
+    )
 }
 
 @Preview(device = Devices.WEAR_OS_SMALL_ROUND, showSystemUi = true)
 @Composable
 fun DefaultPreview() {
-    StationAlarmApp()
+    StationAlarmTheme {
+        SetupScreen(
+            uiState = MainViewModel.UiState(),
+            onStationNameChange = {},
+            onHistoryClick = {},
+            onDistanceChange = {},
+            onStartClick = {},
+            onOpenAppSettings = {}
+        )
+    }
 }

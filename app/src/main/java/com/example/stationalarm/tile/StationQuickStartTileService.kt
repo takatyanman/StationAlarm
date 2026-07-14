@@ -79,6 +79,7 @@ class StationQuickStartTileService : TileService() {
 
         // 円形タイル領域に3チップを収めるためタイトルラベルは省略する
         return PrimaryLayout.Builder(deviceParameters)
+            .setResponsiveContentInsetEnabled(true)
             .setContent(content.build())
             .build()
     }

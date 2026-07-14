@@ -18,21 +18,27 @@ import androidx.core.app.NotificationCompat
 import com.example.stationalarm.LocationManager
 import com.example.stationalarm.R
 import com.example.stationalarm.data.StationRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class StationAlarmService : Service() {
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(serviceJob + Dispatchers.Default)
     private lateinit var repository: StationRepository
     private lateinit var locationManager: LocationManager
     private var locationJob: Job? = null
     private var vibrationJob: Job? = null
+    private var autoStopJob: Job? = null
     // しきい値到達後の二重発火を防ぐフラグ
     private var hasAlarmFired: Boolean = false
+    // GPS の一時的な飛び値で発火しないよう、連続到達回数を保持する
+    private var consecutiveArrivalSamples: Int = 0
 
     private val vibrator by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -52,6 +58,7 @@ class StationAlarmService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_SERVICE) {
+            getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID_ALARM)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -76,6 +83,7 @@ class StationAlarmService : Service() {
         repository.updateIsTracking(true)
         repository.updateStationName(stationName)
         repository.updateMessage(getString(R.string.notification_started))
+        repository.updateHasArrived(false)
 
         startTracking(targetLocation, threshold, stationName)
 
@@ -84,12 +92,15 @@ class StationAlarmService : Service() {
 
     private fun startTracking(target: Location, threshold: Int, stationName: String) {
         locationJob?.cancel()
+        autoStopJob?.cancel()
         hasAlarmFired = false
+        consecutiveArrivalSamples = 0
         locationJob = serviceScope.launch {
             try {
                 locationManager.getLocationFlow().collect { location ->
                     val distance = location.distanceTo(target)
-                    repository.updateDistance(distance)
+                    val accuracy = if (location.hasAccuracy()) location.accuracy else null
+                    repository.updateLocation(distance, accuracy)
 
                     if (!hasAlarmFired) {
                         updateMonitoringNotification(
@@ -97,19 +108,39 @@ class StationAlarmService : Service() {
                         )
                     }
 
-                    // しきい値到達時は1回だけ発火する
-                    if (distance <= threshold && !hasAlarmFired) {
+                    val accuracyIsAcceptable = accuracy == null ||
+                            accuracy <= threshold.coerceAtMost(MAX_ACCEPTABLE_ACCURACY_METERS).toFloat()
+                    consecutiveArrivalSamples = if (
+                        distance <= threshold && accuracyIsAcceptable && !hasAlarmFired
+                    ) {
+                        consecutiveArrivalSamples + 1
+                    } else {
+                        0
+                    }
+
+                    // 許容精度の位置が連続してしきい値内に入った場合だけ、1回発火する
+                    if (
+                        consecutiveArrivalSamples >= REQUIRED_ARRIVAL_SAMPLES &&
+                        !hasAlarmFired
+                    ) {
                         hasAlarmFired = true
                         repository.updateMessage(getString(R.string.notification_arrived))
+                        repository.updateHasArrived(true)
                         // アプリを前面に出してアラーム画面表示と振動を開始する
                         fireArrivalAlarm(stationName)
-                        // 8秒後にサービス自身を停止して追跡を終了する（ユーザーが画面を確認する猶予）
+                        // 到着確認の猶予後にサービス自身を停止して追跡を終了する
                         scheduleAutoStop()
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
-                repository.updateMessage(getString(R.string.notification_error, e.localizedMessage))
+                repository.updateMessage(
+                    getString(R.string.notification_error, e.localizedMessage),
+                    isError = true
+                )
+                stopSelf()
             }
         }
     }
@@ -141,7 +172,8 @@ class StationAlarmService : Service() {
      * 振動完了 + 短い猶予時間を待ってから stopSelf する
      */
     private fun scheduleAutoStop() {
-        serviceScope.launch {
+        autoStopJob?.cancel()
+        autoStopJob = serviceScope.launch {
             kotlinx.coroutines.delay(AUTO_STOP_DELAY_MS)
             stopSelf()
         }
@@ -167,13 +199,13 @@ class StationAlarmService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        val keepErrorMessage = repository.trackingState.value.isError
         locationJob?.cancel()
         vibrationJob?.cancel()
+        autoStopJob?.cancel()
         vibrator.cancel()
-        repository.updateIsTracking(false)
-        repository.updateDistance(null)
-        repository.updateStationName(null)
-        repository.updateMessage("")
+        repository.finishTracking(preserveError = keepErrorMessage)
+        serviceScope.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -217,7 +249,7 @@ class StationAlarmService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID_MONITORING)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(content)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setSmallIcon(R.drawable.ic_station_alarm_notification)
             .setOngoing(true)
             .setContentIntent(buildAppLaunchPendingIntent())
             .build()
@@ -233,7 +265,7 @@ class StationAlarmService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID_ALARM)
             .setContentTitle(stationName)
             .setContentText(getString(R.string.notification_arrived))
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setSmallIcon(R.drawable.ic_station_alarm_notification)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             // 音・通知側の振動を無効化（振動は Service 内 Vibrator で明示制御するため）
@@ -268,7 +300,9 @@ class StationAlarmService : Service() {
 
         // 振動継続時間
         private const val VIBRATION_DURATION_MS = 5000L
-        // アラーム発火後にサービスを自動停止するまでの猶予 (ユーザーが画面を見られる時間を確保)
-        private const val AUTO_STOP_DELAY_MS = 8000L
+        // 到着画面を確認できる時間を確保する
+        private const val AUTO_STOP_DELAY_MS = 30000L
+        private const val REQUIRED_ARRIVAL_SAMPLES = 2
+        private const val MAX_ACCEPTABLE_ACCURACY_METERS = 200
     }
 }

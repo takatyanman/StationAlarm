@@ -37,11 +37,10 @@ class StationRepository private constructor(context: Context) {
         if (stationName.isBlank()) return
         
         val currentList = _history.value.toMutableList()
-        // Remove if exists to move to top
+        // 既存項目を削除して先頭へ移動する
         currentList.remove(stationName)
-        // Add to top
         currentList.add(0, stationName)
-        // Keep only last 5
+        // 直近 5 件だけを保持する
         if (currentList.size > 5) {
             currentList.removeAt(currentList.lastIndex)
         }
@@ -55,16 +54,19 @@ class StationRepository private constructor(context: Context) {
         prefs.edit().putString("history", historyString).apply()
     }
 
-    // Transient state for Service <-> UI communication
+    // Service と UI の間で共有する揮発状態
     private val _trackingState = MutableStateFlow<TrackingState>(TrackingState())
     val trackingState: StateFlow<TrackingState> = _trackingState.asStateFlow()
 
-    fun updateDistance(distance: Float?) {
-        _trackingState.value = _trackingState.value.copy(currentDistance = distance)
+    fun updateLocation(distance: Float?, accuracy: Float?) {
+        _trackingState.value = _trackingState.value.copy(
+            currentDistance = distance,
+            locationAccuracy = accuracy
+        )
     }
 
-    fun updateMessage(message: String) {
-        _trackingState.value = _trackingState.value.copy(message = message)
+    fun updateMessage(message: String, isError: Boolean = false) {
+        _trackingState.value = _trackingState.value.copy(message = message, isError = isError)
     }
     
     fun updateIsTracking(isTracking: Boolean) {
@@ -75,10 +77,28 @@ class StationRepository private constructor(context: Context) {
         _trackingState.value = _trackingState.value.copy(stationName = stationName)
     }
 
+    fun updateHasArrived(hasArrived: Boolean) {
+        _trackingState.value = _trackingState.value.copy(hasArrived = hasArrived)
+    }
+
+    /**
+     * 追跡終了時の共有状態を 1 回の更新で初期化する。
+     */
+    fun finishTracking(preserveError: Boolean) {
+        val current = _trackingState.value
+        _trackingState.value = TrackingState(
+            message = if (preserveError) current.message else "",
+            isError = preserveError && current.isError
+        )
+    }
+
     data class TrackingState(
         val isTracking: Boolean = false,
         val currentDistance: Float? = null,
+        val locationAccuracy: Float? = null,
         val message: String = "",
-        val stationName: String? = null
+        val isError: Boolean = false,
+        val stationName: String? = null,
+        val hasArrived: Boolean = false
     )
 }

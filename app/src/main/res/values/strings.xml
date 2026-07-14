@@ -22,14 +22,31 @@
     <string name="ui_stop">停止</string>
     <string name="ui_decrease">減らす</string>
     <string name="ui_increase">増やす</string>
-    <string name="ui_searching">駅を検索中...</string>
+    <string name="ui_searching">駅を検索中…</string>
     <string name="ui_not_found">駅が見つかりませんでした</string>
+    <string name="ui_not_found_detail">駅が見つかりませんでした。駅名を確認してください。</string>
+    <string name="ui_search_error">エラーが発生しました: %s</string>
+    <string name="ui_unknown_error">原因不明のエラー</string>
     <string name="ui_remaining_distance">残り距離</string>
     <string name="ui_monitoring_station">監視中: %s</string>
     <string name="ui_arrived">到着しました</string>
-    <string name="ui_service_starting">サービスを起動中...</string>
+    <string name="ui_service_starting">サービスを起動中…</string>
+    <string name="ui_start_tracking">追跡を開始</string>
+    <string name="ui_status_moving">🚄 移動中</string>
+    <string name="ui_status_near">📍 接近中…</string>
+    <string name="ui_status_soon">🚃 まもなく到着！</string>
+    <string name="ui_location_acquiring">位置を取得中…</string>
+    <string name="ui_location_accuracy">精度 ±%dm</string>
+    <string name="ui_arrived_title">到着しました</string>
+    <string name="ui_confirm">確認</string>
+    <string name="ui_open_settings">権限設定を開く</string>
+    <string name="ui_permission_location_required">接近通知には位置情報の許可が必要です。</string>
+    <string name="ui_permission_precise_required">駅への接近を判定するため「正確な位置情報」を許可してください。</string>
+    <string name="ui_permission_notifications_required">到着を見逃さないため通知を許可してください。</string>
+    <string name="ui_tracking_already_active">すでに別の駅を追跡中です。</string>
 
     <!-- Tile (クイック起動) -->
     <string name="tile_label">駅近クイック起動</string>
+    <string name="tile_description">よく使う駅への接近通知をすばやく開始します</string>
     <string name="tile_title">クイック起動</string>
 </resources>

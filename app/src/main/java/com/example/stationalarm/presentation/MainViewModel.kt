@@ -1,18 +1,23 @@
 package com.example.stationalarm.presentation
 
 import android.app.Application
+import android.location.Address
 import android.location.Geocoder
 import android.location.Location
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.stationalarm.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.coroutines.resume
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -35,7 +40,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isTracking = state.isTracking,
                         currentDistance = state.currentDistance,
                         message = state.message,
-                        stationName = state.stationName ?: _uiState.value.stationName
+                        messageIsError = state.isError,
+                        stationName = state.stationName.orEmpty(),
+                        hasArrived = state.hasArrived,
+                        locationAccuracy = state.locationAccuracy
                     )
                 }
             }
@@ -43,7 +51,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateStationNameInput(input: String) {
-        _uiState.value = _uiState.value.copy(stationNameInput = input)
+        _uiState.value = _uiState.value.copy(
+            stationNameInput = input,
+            message = "",
+            messageIsError = false,
+            requiresAppSettings = false
+        )
     }
 
     fun updateDistanceThreshold(distance: Int) {
@@ -52,42 +65,82 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * タイルなど外部トリガーから、駅名としきい値を指定して即追跡開始する。
-     * 既に追跡中の場合は何もしない（重複起動を避ける）。
+     * タイルなど外部導線から受け取った追跡条件を、権限確認前に UI へ反映する。
      */
-    fun startTrackingFor(stationName: String, threshold: Int) {
-        if (_uiState.value.isTracking) return
+    fun prepareTrackingFor(stationName: String, threshold: Int) {
+        if (_uiState.value.isTracking || _uiState.value.isSearching) return
         _uiState.value = _uiState.value.copy(
-            stationNameInput = stationName,
-            distanceThreshold = threshold.coerceIn(100, 2000)
+            stationNameInput = stationName.trim(),
+            distanceThreshold = threshold.coerceIn(100, 2000),
+            message = "",
+            messageIsError = false,
+            requiresAppSettings = false
         )
-        startTracking()
+    }
+
+    fun showMessage(message: String, isError: Boolean, requiresAppSettings: Boolean = false) {
+        _uiState.value = _uiState.value.copy(
+            message = message,
+            messageIsError = isError,
+            requiresAppSettings = requiresAppSettings,
+            isSearching = false
+        )
     }
 
     fun startTracking() {
-        if (_uiState.value.stationNameInput.isBlank()) return
+        val currentState = _uiState.value
+        if (
+            currentState.stationNameInput.isBlank() ||
+            currentState.isSearching ||
+            currentState.isTracking
+        ) return
+
+        val stationName = currentState.stationNameInput.trim()
         
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(message = "駅を検索中...")
+            _uiState.value = _uiState.value.copy(
+                stationNameInput = stationName,
+                isSearching = true,
+                message = getApplication<Application>().getString(R.string.ui_searching),
+                messageIsError = false,
+                requiresAppSettings = false
+            )
             
             try {
-                val location = searchStation(_uiState.value.stationNameInput)
+                val location = searchStation(stationName)
                 if (location != null) {
-                    // 検索成功。即座に画面を切り替える
+                    // 検索成功後、サービス開始失敗を捕捉できる状態で起動する
                     _uiState.value = _uiState.value.copy(
                         isTracking = true,
-                        stationName = _uiState.value.stationNameInput,
-                        message = "追跡を開始しています..."
+                        isSearching = false,
+                        stationName = stationName,
+                        message = getApplication<Application>().getString(R.string.ui_service_starting),
+                        messageIsError = false
                     )
-                    
-                    repository.addStation(_uiState.value.stationNameInput)
-                    startService(location, _uiState.value.stationNameInput)
+
+                    startService(location, stationName)
+                    repository.addStation(stationName)
                 } else {
-                    _uiState.value = _uiState.value.copy(message = "駅が見つかりませんでした。駅名を正しく入力してください。")
+                    _uiState.value = _uiState.value.copy(
+                        isSearching = false,
+                        message = getApplication<Application>().getString(R.string.ui_not_found_detail),
+                        messageIsError = true
+                    )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
-                _uiState.value = _uiState.value.copy(message = "エラーが発生しました: ${e.message}")
+                _uiState.value = _uiState.value.copy(
+                    isSearching = false,
+                    isTracking = false,
+                    currentDistance = null,
+                    message = getApplication<Application>().getString(
+                        R.string.ui_search_error,
+                        e.localizedMessage ?: getApplication<Application>().getString(R.string.ui_unknown_error)
+                    ),
+                    messageIsError = true
+                )
             }
         }
     }
@@ -101,7 +154,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(
             isTracking = false,
             currentDistance = null,
-            message = ""
+            message = "",
+            messageIsError = false,
+            hasArrived = false,
+            locationAccuracy = null
         )
     }
 
@@ -120,21 +176,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun searchStation(name: String): Location? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val query = if (name.endsWith("駅")) name else "$name 駅"
-                @Suppress("DEPRECATION")
-                val addresses = geocoder.getFromLocationName(query, 1)
-                if (!addresses.isNullOrEmpty()) {
-                    val address = addresses[0]
-                    Location("").apply {
-                        latitude = address.latitude
-                        longitude = address.longitude
-                    }
-                } else null
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
+        val query = if (name.endsWith("駅")) name else "$name 駅"
+        val addresses = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                suspendCancellableCoroutine<List<Address>> { continuation ->
+                    geocoder.getFromLocationName(
+                        query,
+                        1,
+                        object : Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: MutableList<Address>) {
+                                if (continuation.isActive) continuation.resume(addresses.toList())
+                            }
+
+                            override fun onError(errorMessage: String?) {
+                                if (continuation.isActive) continuation.resume(emptyList())
+                            }
+                        }
+                    )
+                }
+            } else {
+                withContext(Dispatchers.IO) {
+                    @Suppress("DEPRECATION")
+                    geocoder.getFromLocationName(query, 1).orEmpty()
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+
+        return addresses.firstOrNull()?.let { address ->
+            Location("").apply {
+                latitude = address.latitude
+                longitude = address.longitude
             }
         }
     }
@@ -144,8 +220,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val stationName: String = "",
         val distanceThreshold: Int = 500,
         val isTracking: Boolean = false,
+        val isSearching: Boolean = false,
+        val hasArrived: Boolean = false,
         val currentDistance: Float? = null,
+        val locationAccuracy: Float? = null,
         val message: String = "",
+        val messageIsError: Boolean = false,
+        val requiresAppSettings: Boolean = false,
         val history: List<String> = emptyList()
     )
 }
