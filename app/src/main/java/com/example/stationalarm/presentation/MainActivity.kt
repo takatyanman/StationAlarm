@@ -2,6 +2,7 @@ package com.example.stationalarm.presentation
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.RemoteInput
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -18,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import androidx.wear.input.RemoteInputIntentHelper
 import com.example.stationalarm.R
 import com.example.stationalarm.presentation.theme.StationAlarmTheme
 import com.example.stationalarm.service.ArrivalAlarmContract
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private lateinit var locationPermissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
+    private lateinit var stationInputLauncher: ActivityResultLauncher<Intent>
     private var pendingTrackingStart = false
     private var isActivityResumed = false
     private var arrivalAutoCloseJob: Job? = null
@@ -79,11 +82,27 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        stationInputLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode != RESULT_OK || result.data == null) {
+                return@registerForActivityResult
+            }
+            val stationName = RemoteInput.getResultsFromIntent(result.data)
+                ?.getCharSequence(STATION_INPUT_RESULT_KEY)
+                ?.toString()
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: return@registerForActivityResult
+            viewModel.updateStationNameInput(stationName)
+        }
+
         setContent {
             StationAlarmTheme {
                 StationAlarmApp(
                     viewModel = viewModel,
                     onStartRequested = ::requestTrackingStart,
+                    onStationInputRequested = ::requestStationNameInput,
                     onOpenAppSettings = ::openAppSettings
                 )
             }
@@ -156,6 +175,26 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun requestStationNameInput() {
+        val remoteInput = RemoteInput.Builder(STATION_INPUT_RESULT_KEY)
+            .setLabel(getString(R.string.ui_station_input_prompt))
+            .setAllowFreeFormInput(true)
+            .build()
+        val inputIntent = RemoteInputIntentHelper.createActionRemoteInputIntent().also { intent ->
+            RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
+            RemoteInputIntentHelper.putTitleExtra(
+                intent,
+                getString(R.string.ui_station_input_title)
+            )
+            RemoteInputIntentHelper.putConfirmLabelExtra(
+                intent,
+                getString(R.string.ui_station_input_confirm)
+            )
+            RemoteInputIntentHelper.putCancelLabelExtra(intent, getString(R.string.ui_cancel))
+        }
+        stationInputLauncher.launch(inputIntent)
+    }
+
     private fun scheduleArrivalAutoClose(intent: Intent?, activityWasVisible: Boolean) {
         arrivalAutoCloseJob?.cancel()
 
@@ -218,11 +257,13 @@ class MainActivity : ComponentActivity() {
 fun StationAlarmApp(
     viewModel: MainViewModel,
     onStartRequested: () -> Unit,
+    onStationInputRequested: () -> Unit,
     onOpenAppSettings: () -> Unit
 ) {
     StationAlarmScreen(
         viewModel = viewModel,
         onStartRequested = onStartRequested,
+        onStationInputRequested = onStationInputRequested,
         onOpenAppSettings = onOpenAppSettings
     )
 }
@@ -233,12 +274,14 @@ fun DefaultPreview() {
     StationAlarmTheme {
         SetupScreen(
             uiState = MainViewModel.UiState(),
-            onStationNameChange = {},
             onHistoryClick = {},
             onDistanceChange = {},
             onReplaceFavorite = { _, _ -> },
+            onStationInputRequested = {},
             onStartClick = {},
             onOpenAppSettings = {}
         )
     }
 }
+
+private const val STATION_INPUT_RESULT_KEY = "station_name_input"

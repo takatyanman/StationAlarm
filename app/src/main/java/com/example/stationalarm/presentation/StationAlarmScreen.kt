@@ -14,14 +14,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Done
@@ -52,7 +49,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,6 +88,7 @@ import kotlinx.coroutines.launch
 fun StationAlarmScreen(
     viewModel: MainViewModel,
     onStartRequested: () -> Unit,
+    onStationInputRequested: () -> Unit,
     onOpenAppSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -122,10 +119,10 @@ fun StationAlarmScreen(
 
             else -> SetupScreen(
                 uiState = uiState,
-                onStationNameChange = viewModel::updateStationNameInput,
                 onHistoryClick = viewModel::updateStationNameInput,
                 onDistanceChange = viewModel::updateDistanceThreshold,
                 onReplaceFavorite = viewModel::replaceFavoriteStation,
+                onStationInputRequested = onStationInputRequested,
                 onStartClick = onStartRequested,
                 onOpenAppSettings = onOpenAppSettings
             )
@@ -397,10 +394,10 @@ fun TrackingScreen(
 @Composable
 fun SetupScreen(
     uiState: MainViewModel.UiState,
-    onStationNameChange: (String) -> Unit,
     onHistoryClick: (String) -> Unit,
     onDistanceChange: (Int) -> Unit,
     onReplaceFavorite: (Int, String) -> Unit,
+    onStationInputRequested: () -> Unit,
     onStartClick: () -> Unit,
     onOpenAppSettings: () -> Unit
 ) {
@@ -479,43 +476,30 @@ fun SetupScreen(
                 ) {
                     SectionLabel(text = stringResource(R.string.ui_station_label))
                     Spacer(modifier = Modifier.height(4.dp))
-                    androidx.compose.material.TextField(
-                        value = uiState.stationNameInput,
-                        onValueChange = onStationNameChange,
+                    Chip(
+                        onClick = onStationInputRequested,
                         enabled = !uiState.isSearching,
-                        placeholder = {
+                        label = {
                             Text(
-                                text = stringResource(R.string.ui_input_hint),
-                                style = MaterialTheme.typography.body2,
-                                color = TextSecondary,
+                                text = uiState.stationNameInput.ifBlank {
+                                    stringResource(R.string.ui_input_hint)
+                                },
                                 maxLines = 1
                             )
                         },
-                        leadingIcon = {
+                        secondaryLabel = {
+                            Text(stringResource(R.string.ui_station_input_action))
+                        },
+                        icon = {
                             Icon(
                                 imageVector = Icons.Filled.LocationOn,
                                 contentDescription = null,
                                 tint = JRGreen
                             )
                         },
-                        colors = androidx.compose.material.TextFieldDefaults.textFieldColors(
-                            textColor = TextPrimary,
-                            cursorColor = JRGreen,
-                            backgroundColor = DarkSurface,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent
-                        ),
-                        textStyle = MaterialTheme.typography.body1,
-                        shape = RoundedCornerShape(22.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(
-                            onDone = { focusManager.clearFocus() }
-                        ),
+                        colors = ChipDefaults.secondaryChipColors(backgroundColor = DarkSurface),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 54.dp)
                     )
                 }
             }

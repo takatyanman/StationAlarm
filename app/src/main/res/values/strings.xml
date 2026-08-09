@@ -18,8 +18,12 @@
     <string name="ui_setup_subtitle">降りる駅をセット</string>
     <string name="ui_station_label">目的の駅</string>
     <string name="ui_input_hint">例：新宿</string>
+    <string name="ui_station_input_action">タップして入力・音声入力</string>
+    <string name="ui_station_input_title">目的の駅</string>
+    <string name="ui_station_input_prompt">駅名を入力</string>
+    <string name="ui_station_input_confirm">決定</string>
     <string name="ui_quick_stations">お気に入り</string>
-    <string name="ui_favorite_edit_hint">変更：上に新しい駅名を入力</string>
+    <string name="ui_favorite_edit_hint">変更：上の駅名をタップして入力</string>
     <string name="ui_save_favorite">お気に入りを変更</string>
     <string name="ui_replace_favorite_title">置き換える駅を選択</string>
     <string name="ui_replace_favorite_detail">「%s」を登録します</string>
