@@ -27,8 +27,10 @@ class StationQuickStartTileServiceTest {
     @Test
     fun tileRowsContainEveryStationExactlyOnce() {
         val favorites = FavoriteStationDefaults.names.toFavoriteStations()
-        val stationsInRows = favorites.toTileRows().flatten()
+        val rows = favorites.toTileRows()
+        val stationsInRows = rows.flatten()
 
+        assertEquals(listOf(2, 3), rows.map { it.size })
         assertEquals(favorites, stationsInRows)
     }
 

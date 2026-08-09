@@ -524,7 +524,15 @@ fun SetupScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     SectionLabel(
                         text = stringResource(R.string.ui_quick_stations),
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 1.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.ui_favorite_edit_hint),
+                        style = MaterialTheme.typography.caption2,
+                        color = TextSecondary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp)
                     )
                     StationChipGrid(
                         stations = uiState.favoriteStations,

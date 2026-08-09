@@ -106,7 +106,7 @@ class StationQuickStartTileService : TileService() {
             content.addContent(row.build())
         }
 
-        // 円形タイル領域に5チップを収めるため、3段の中央揃えにしてタイトルは省略する
+        // 円形タイルの下端で切れないよう、5チップを2段の中央揃えにしてタイトルは省略する
         return PrimaryLayout.Builder(deviceParameters)
             .setResponsiveContentInsetEnabled(true)
             .setContent(content.build())

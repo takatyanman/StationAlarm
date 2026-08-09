@@ -31,8 +31,11 @@ fun List<String>.toFavoriteStations(): List<FavoriteStation> =
         FavoriteStation(slot = index, name = name)
     }
 
-/** 5件を2列・2列・1列で、登録順のまま配置する。 */
-fun List<FavoriteStation>.toTileRows(): List<List<FavoriteStation>> = chunked(2)
+/** 5件を2列・3列の2段で、登録順のまま配置する。 */
+fun List<FavoriteStation>.toTileRows(): List<List<FavoriteStation>> = when {
+    size <= 3 -> listOf(this)
+    else -> listOf(take(2), drop(2))
+}
 
 /** 正常な置換だけ新しい5件を返し、重複・空文字・範囲外は null を返す。 */
 fun List<String>.withFavoriteReplaced(index: Int, stationName: String): List<String>? {
