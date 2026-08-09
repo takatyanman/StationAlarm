@@ -1,4 +1,4 @@
-package com.example.stationalarm
+package com.example.stationalarm.location
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -14,10 +14,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-class LocationManager(private val context: Context) {
+class LocationManager(context: Context) {
 
     private val fusedLocationClient: FusedLocationProviderClient =
-        LocationServices.getFusedLocationProviderClient(context)
+        LocationServices.getFusedLocationProviderClient(context.applicationContext)
 
     @SuppressLint("MissingPermission")
     fun getLocationFlow(): Flow<Location> = callbackFlow {

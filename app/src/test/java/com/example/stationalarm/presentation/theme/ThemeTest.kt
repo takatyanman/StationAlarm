@@ -20,4 +20,12 @@ class ThemeTest {
         assertEquals(DistanceBand.NEAR, getDistanceBand(distance = 500f, threshold = 500))
         assertEquals(DistanceBand.VERY_NEAR, getDistanceBand(distance = 250f, threshold = 500))
     }
+
+    @Test
+    fun distanceDisplayUsesKilometersForLongDistances() {
+        assertEquals(DistanceDisplay("---", "m"), formatDistance(null))
+        assertEquals(DistanceDisplay("750", "m"), formatDistance(750f))
+        assertEquals(DistanceDisplay("1.3", "km"), formatDistance(1_250f))
+        assertEquals(DistanceDisplay("834", "km"), formatDistance(833_519f))
+    }
 }

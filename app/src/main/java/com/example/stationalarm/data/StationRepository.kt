@@ -2,6 +2,9 @@ package com.example.stationalarm.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.stationalarm.domain.model.FavoriteStationDefaults
+import com.example.stationalarm.domain.model.MAX_FAVORITE_STATIONS
+import com.example.stationalarm.domain.model.withFavoriteReplaced
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,6 +13,8 @@ class StationRepository private constructor(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("station_prefs", Context.MODE_PRIVATE)
     private val _history = MutableStateFlow<List<String>>(emptyList())
     val history: StateFlow<List<String>> = _history.asStateFlow()
+    private val _favoriteStations = MutableStateFlow(FavoriteStationDefaults.names)
+    val favoriteStations: StateFlow<List<String>> = _favoriteStations.asStateFlow()
 
     companion object {
         @Volatile
@@ -24,6 +29,7 @@ class StationRepository private constructor(context: Context) {
 
     init {
         loadHistory()
+        loadFavoriteStations()
     }
 
     private fun loadHistory() {
@@ -65,6 +71,38 @@ class StationRepository private constructor(context: Context) {
         )
     }
 
+    private fun loadFavoriteStations() {
+        val stored = prefs.getString(FavoritePreferences.KEY_FAVORITE_STATIONS, null)
+            ?.split(FavoritePreferences.FAVORITE_SEPARATOR)
+            ?.map(String::trim)
+            ?.filter(String::isNotEmpty)
+            ?.distinct()
+            ?.take(MAX_FAVORITE_STATIONS)
+            .orEmpty()
+
+        _favoriteStations.value = if (stored.size == MAX_FAVORITE_STATIONS) {
+            stored
+        } else {
+            (stored + FavoriteStationDefaults.names)
+                .distinct()
+                .take(MAX_FAVORITE_STATIONS)
+        }
+    }
+
+    /** 指定スロットを置換する。重複・空文字・範囲外は変更しない。 */
+    fun replaceFavoriteStation(index: Int, stationName: String): Boolean {
+        val updated = _favoriteStations.value.withFavoriteReplaced(index, stationName)
+            ?: return false
+        _favoriteStations.value = updated
+        prefs.edit()
+            .putString(
+                FavoritePreferences.KEY_FAVORITE_STATIONS,
+                _favoriteStations.value.joinToString(FavoritePreferences.FAVORITE_SEPARATOR)
+            )
+            .apply()
+        return true
+    }
+
     fun updateMessage(message: String, isError: Boolean = false) {
         _trackingState.value = _trackingState.value.copy(message = message, isError = isError)
     }
@@ -101,4 +139,9 @@ class StationRepository private constructor(context: Context) {
         val stationName: String? = null,
         val hasArrived: Boolean = false
     )
+
+    private object FavoritePreferences {
+        const val KEY_FAVORITE_STATIONS = "favorite_stations"
+        const val FAVORITE_SEPARATOR = "\u001F"
+    }
 }

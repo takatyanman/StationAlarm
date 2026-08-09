@@ -42,12 +42,21 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".tile.TileUpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:launchMode="singleTask"
+            android:taskAffinity="com.example.stationalarm"
             android:theme="@android:style/Theme.DeviceDefault">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

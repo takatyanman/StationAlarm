@@ -11,13 +11,15 @@ import com.example.stationalarm.presentation.MainActivity
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
-import com.example.stationalarm.LocationManager
+import androidx.wear.ongoing.OngoingActivity
 import com.example.stationalarm.R
 import com.example.stationalarm.data.StationRepository
+import com.example.stationalarm.location.LocationManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,7 +128,7 @@ class StationAlarmService : Service() {
                         hasAlarmFired = true
                         repository.updateMessage(getString(R.string.notification_arrived))
                         repository.updateHasArrived(true)
-                        // アプリを前面に出してアラーム画面表示と振動を開始する
+                        // フルスクリーン通知でアラーム画面表示と振動を開始する
                         fireArrivalAlarm(stationName)
                         // 到着確認の猶予後にサービス自身を停止して追跡を終了する
                         scheduleAutoStop()
@@ -151,7 +153,6 @@ class StationAlarmService : Service() {
     private fun fireArrivalAlarm(stationName: String) {
         vibrate()
         showAlarmNotification(stationName)
-        launchAppToForeground()
     }
 
     private fun vibrate() {
@@ -162,7 +163,7 @@ class StationAlarmService : Service() {
         // 5秒後に自動停止
         vibrationJob?.cancel()
         vibrationJob = serviceScope.launch {
-            kotlinx.coroutines.delay(VIBRATION_DURATION_MS)
+            kotlinx.coroutines.delay(ArrivalAlarmContract.COMPLETION_DELAY_MS)
             vibrator.cancel()
         }
     }
@@ -174,26 +175,8 @@ class StationAlarmService : Service() {
     private fun scheduleAutoStop() {
         autoStopJob?.cancel()
         autoStopJob = serviceScope.launch {
-            kotlinx.coroutines.delay(AUTO_STOP_DELAY_MS)
+            kotlinx.coroutines.delay(ArrivalAlarmContract.COMPLETION_DELAY_MS)
             stopSelf()
-        }
-    }
-
-    /**
-     * MainActivity を直接起動してアプリを前面化する
-     * 画面ロック中・スリープ中でも起動するように TURN_SCREEN_ON を併用
-     */
-    private fun launchAppToForeground() {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            // バックグラウンドからの startActivity 制限に該当した場合は通知のフルスクリーン Intent に頼る
-            e.printStackTrace()
         }
     }
 
@@ -204,6 +187,7 @@ class StationAlarmService : Service() {
         vibrationJob?.cancel()
         autoStopJob?.cancel()
         vibrator.cancel()
+        getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID_ALARM)
         repository.finishTracking(preserveError = keepErrorMessage)
         serviceScope.cancel()
     }
@@ -216,28 +200,26 @@ class StationAlarmService : Service() {
      *  - アラームチャネル (HIGH): 到着時のフルスクリーン通知用、画面に強制表示
      */
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
+        val manager = getSystemService(NotificationManager::class.java)
 
-            val monitoringChannel = NotificationChannel(
-                CHANNEL_ID_MONITORING,
-                getString(R.string.channel_name),
-                NotificationManager.IMPORTANCE_LOW
-            )
-            manager.createNotificationChannel(monitoringChannel)
+        val monitoringChannel = NotificationChannel(
+            CHANNEL_ID_MONITORING,
+            getString(R.string.channel_name),
+            NotificationManager.IMPORTANCE_LOW
+        )
+        manager.createNotificationChannel(monitoringChannel)
 
-            val alarmChannel = NotificationChannel(
-                CHANNEL_ID_ALARM,
-                getString(R.string.channel_name_alarm),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = getString(R.string.channel_description_alarm)
-                // 音は鳴らさない: 振動のみで通知する
-                setSound(null, null)
-                enableVibration(false)
-            }
-            manager.createNotificationChannel(alarmChannel)
+        val alarmChannel = NotificationChannel(
+            CHANNEL_ID_ALARM,
+            getString(R.string.channel_name_alarm),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = getString(R.string.channel_description_alarm)
+            // 音は鳴らさない: 振動のみで通知する
+            setSound(null, null)
+            enableVibration(false)
         }
+        manager.createNotificationChannel(alarmChannel)
     }
 
     private fun updateMonitoringNotification(content: String) {
@@ -246,13 +228,24 @@ class StationAlarmService : Service() {
     }
 
     private fun createMonitoringNotification(content: String): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID_MONITORING)
+        val touchIntent = buildAppLaunchPendingIntent()
+        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID_MONITORING)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_station_alarm_notification)
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
-            .setContentIntent(buildAppLaunchPendingIntent())
+            .setContentIntent(touchIntent)
+
+        OngoingActivity.Builder(this, NOTIFICATION_ID_MONITORING, notificationBuilder)
+            .setStaticIcon(R.drawable.ic_station_alarm_notification)
+            .setTouchIntent(touchIntent)
+            .setContentDescription(getString(R.string.ongoing_activity_description))
             .build()
+            .apply(this)
+
+        return notificationBuilder.build()
     }
 
     /**
@@ -261,7 +254,8 @@ class StationAlarmService : Service() {
      * フルスクリーン Intent をより確実に発火させる
      */
     private fun showAlarmNotification(stationName: String) {
-        val pendingIntent = buildAppLaunchPendingIntent()
+        val fullScreenPendingIntent = buildAppLaunchPendingIntent(autoClose = true)
+        val contentPendingIntent = buildAppLaunchPendingIntent(autoClose = false)
         val notification = NotificationCompat.Builder(this, CHANNEL_ID_ALARM)
             .setContentTitle(stationName)
             .setContentText(getString(R.string.notification_arrived))
@@ -271,20 +265,27 @@ class StationAlarmService : Service() {
             // 音・通知側の振動を無効化（振動は Service 内 Vibrator で明示制御するため）
             .setSound(null)
             .setDefaults(0)
-            .setFullScreenIntent(pendingIntent, true)
-            .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .build()
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID_ALARM, notification)
     }
 
-    private fun buildAppLaunchPendingIntent(): PendingIntent {
+    private fun buildAppLaunchPendingIntent(autoClose: Boolean = false): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (autoClose) {
+                putExtra(
+                    ArrivalAlarmContract.EXTRA_AUTO_CLOSE_AT_ELAPSED_REALTIME,
+                    SystemClock.elapsedRealtime() + ArrivalAlarmContract.COMPLETION_DELAY_MS
+                )
+            }
         }
         return PendingIntent.getActivity(
-            this, 0, intent,
+            this,
+            if (autoClose) REQUEST_CODE_ARRIVAL_FULL_SCREEN else REQUEST_CODE_APP_LAUNCH,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
@@ -297,11 +298,9 @@ class StationAlarmService : Service() {
         private const val CHANNEL_ID_ALARM = "station_alarm_channel_high"
         private const val NOTIFICATION_ID_MONITORING = 1
         private const val NOTIFICATION_ID_ALARM = 2
+        private const val REQUEST_CODE_APP_LAUNCH = 0
+        private const val REQUEST_CODE_ARRIVAL_FULL_SCREEN = 1
 
-        // 振動継続時間
-        private const val VIBRATION_DURATION_MS = 5000L
-        // 到着画面を確認できる時間を確保する
-        private const val AUTO_STOP_DELAY_MS = 30000L
         private const val REQUIRED_ARRIVAL_SAMPLES = 2
         private const val MAX_ACCEPTABLE_ACCURACY_METERS = 200
     }

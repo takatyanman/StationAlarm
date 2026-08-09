@@ -11,34 +11,46 @@
     <string name="notification_remaining">残り: %1$dm (%2$s)</string>
     <string name="notification_arrived">目的地に接近しました！</string>
     <string name="notification_error">エラー: %s</string>
+    <string name="ongoing_activity_description">駅への接近を監視中。タップして追跡画面を開きます</string>
     
     <!-- UI -->
-    <string name="ui_title">駅近振動通知</string>
-    <string name="ui_station_label">駅名</string>
-    <string name="ui_input_hint">駅名を入力</string>
-    <string name="ui_history">履歴</string>
-    <string name="ui_distance_threshold">通知距離: %dm</string>
-    <string name="ui_start">開始</string>
+    <string name="ui_title">駅近アラーム</string>
+    <string name="ui_setup_subtitle">降りる駅をセット</string>
+    <string name="ui_station_label">目的の駅</string>
+    <string name="ui_input_hint">例：新宿</string>
+    <string name="ui_quick_stations">お気に入り</string>
+    <string name="ui_save_favorite">お気に入りに登録</string>
+    <string name="ui_replace_favorite_title">置き換える駅を選択</string>
+    <string name="ui_replace_favorite_detail">「%s」を登録します</string>
+    <string name="ui_replace_this_favorite">この駅と置き換える</string>
+    <string name="ui_favorite_updated">「%s」をお気に入りに登録しました</string>
+    <string name="ui_history">最近使った駅</string>
+    <string name="ui_distance_threshold">%dm</string>
+    <string name="ui_distance_label">通知距離</string>
     <string name="ui_stop">停止</string>
     <string name="ui_decrease">減らす</string>
     <string name="ui_increase">増やす</string>
     <string name="ui_searching">駅を検索中…</string>
-    <string name="ui_not_found">駅が見つかりませんでした</string>
+    <string name="ui_select_station_title">駅を確認</string>
+    <string name="ui_select_station_detail">場所を確認して候補を選んでください</string>
+    <string name="ui_address_unknown">住所情報なし</string>
+    <string name="ui_cancel">キャンセル</string>
     <string name="ui_not_found_detail">駅が見つかりませんでした。駅名を確認してください。</string>
     <string name="ui_search_error">エラーが発生しました: %s</string>
     <string name="ui_unknown_error">原因不明のエラー</string>
     <string name="ui_remaining_distance">残り距離</string>
-    <string name="ui_monitoring_station">監視中: %s</string>
-    <string name="ui_arrived">到着しました</string>
     <string name="ui_service_starting">サービスを起動中…</string>
-    <string name="ui_start_tracking">追跡を開始</string>
-    <string name="ui_status_moving">🚄 移動中</string>
-    <string name="ui_status_near">📍 接近中…</string>
-    <string name="ui_status_soon">🚃 まもなく到着！</string>
+    <string name="ui_start_tracking">通知を開始</string>
+    <string name="ui_start_summary">%1$s・%2$dm</string>
+    <string name="ui_input_required">駅名を入力してください</string>
+    <string name="ui_status_moving">移動中</string>
+    <string name="ui_status_near">接近中</string>
+    <string name="ui_status_soon">まもなく到着</string>
     <string name="ui_location_acquiring">位置を取得中…</string>
     <string name="ui_location_accuracy">精度 ±%dm</string>
     <string name="ui_arrived_title">到着しました</string>
-    <string name="ui_confirm">確認</string>
+    <string name="ui_arrived_detail">通知範囲に入りました</string>
+    <string name="ui_confirm">停止して戻る</string>
     <string name="ui_open_settings">権限設定を開く</string>
     <string name="ui_permission_location_required">接近通知には位置情報の許可が必要です。</string>
     <string name="ui_permission_precise_required">駅への接近を判定するため「正確な位置情報」を許可してください。</string>
@@ -48,5 +60,4 @@
     <!-- Tile (クイック起動) -->
     <string name="tile_label">駅近クイック起動</string>
     <string name="tile_description">よく使う駅への接近通知をすばやく開始します</string>
-    <string name="tile_title">クイック起動</string>
 </resources>

@@ -7,19 +7,24 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import com.example.stationalarm.R
 import com.example.stationalarm.presentation.theme.StationAlarmTheme
-import com.example.stationalarm.tile.StationQuickStartTileService
+import com.example.stationalarm.service.ArrivalAlarmContract
+import com.example.stationalarm.tile.QuickStartContract
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -27,6 +32,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var locationPermissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
     private var pendingTrackingStart = false
+    private var isActivityResumed = false
+    private var arrivalAutoCloseJob: Job? = null
 
     // FragmentActivity を使用していないため、Fragment 版数に関する誤検出を局所的に抑制する
     @SuppressLint("InvalidFragmentVersionForActivityResult")
@@ -84,12 +91,25 @@ class MainActivity : ComponentActivity() {
 
         // タイルから受け取った駅名は、画面構築後に権限確認付きで処理する
         consumeQuickStartIntent(intent)
+        scheduleArrivalAutoClose(intent, activityWasVisible = false)
     }
 
     override fun onNewIntent(intent: Intent) {
+        val activityWasVisible = isActivityResumed
         super.onNewIntent(intent)
         setIntent(intent)
         consumeQuickStartIntent(intent)
+        scheduleArrivalAutoClose(intent, activityWasVisible)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isActivityResumed = true
+    }
+
+    override fun onPause() {
+        isActivityResumed = false
+        super.onPause()
     }
 
     private fun requestTrackingStart() {
@@ -136,13 +156,37 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun scheduleArrivalAutoClose(intent: Intent?, activityWasVisible: Boolean) {
+        arrivalAutoCloseJob?.cancel()
+
+        val closeAt = intent?.getLongExtra(
+            ArrivalAlarmContract.EXTRA_AUTO_CLOSE_AT_ELAPSED_REALTIME,
+            0L
+        ) ?: 0L
+
+        val autoCloseDelay = ArrivalAlarmContract.remainingAutoCloseDelayMs(
+            closeAtElapsedRealtime = closeAt,
+            nowElapsedRealtime = SystemClock.elapsedRealtime(),
+            activityWasVisible = activityWasVisible
+        )
+        if (autoCloseDelay == null) {
+            intent?.removeExtra(ArrivalAlarmContract.EXTRA_AUTO_CLOSE_AT_ELAPSED_REALTIME)
+            return
+        }
+
+        arrivalAutoCloseJob = lifecycleScope.launch {
+            delay(autoCloseDelay)
+            finishAndRemoveTask()
+        }
+    }
+
     /**
      * タイルから渡された駅名を反映し、通常画面と同じ権限確認を通して追跡開始する。
      */
     private fun consumeQuickStartIntent(intent: Intent?) {
-        val station = intent?.getStringExtra(StationQuickStartTileService.EXTRA_QUICK_STATION)
+        val station = intent?.getStringExtra(QuickStartContract.EXTRA_STATION_NAME)
             ?: return
-        intent.removeExtra(StationQuickStartTileService.EXTRA_QUICK_STATION)
+        intent.removeExtra(QuickStartContract.EXTRA_STATION_NAME)
 
         if (viewModel.uiState.value.isTracking || viewModel.uiState.value.isSearching) {
             viewModel.showMessage(
@@ -150,7 +194,7 @@ class MainActivity : ComponentActivity() {
                 isError = false
             )
         } else {
-            viewModel.prepareTrackingFor(station, StationQuickStartTileService.QUICK_THRESHOLD)
+            viewModel.prepareTrackingFor(station, QuickStartContract.DEFAULT_THRESHOLD_METERS)
             requestTrackingStart()
         }
     }
@@ -183,7 +227,7 @@ fun StationAlarmApp(
     )
 }
 
-@Preview(device = Devices.WEAR_OS_SMALL_ROUND, showSystemUi = true)
+@Preview(device = "id:wearos_small_round", showSystemUi = true)
 @Composable
 fun DefaultPreview() {
     StationAlarmTheme {
@@ -192,6 +236,7 @@ fun DefaultPreview() {
             onStationNameChange = {},
             onHistoryClick = {},
             onDistanceChange = {},
+            onReplaceFavorite = { _, _ -> },
             onStartClick = {},
             onOpenAppSettings = {}
         )

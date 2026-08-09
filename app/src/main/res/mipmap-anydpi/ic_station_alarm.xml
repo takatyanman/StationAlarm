@@ -1,29 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <path
-        android:fillColor="#15192A"
-        android:pathData="M54,8 A46,46 0,1 0,54 100 A46,46 0,1 0,54 8" />
-    <path
-        android:pathData="M34,31 L41,31 L45,24 L50,38 L56,21 L62,38 L67,27 L71,31 L78,31"
-        android:strokeColor="#00A651"
-        android:strokeWidth="4"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M37,40 C33,40 30,43 30,47 L30,70 C30,77 35,82 42,82 L66,82 C73,82 78,77 78,70 L78,47 C78,43 75,40 71,40 Z" />
-    <path
-        android:fillColor="#15192A"
-        android:pathData="M38,47 L70,47 C72,47 73,49 73,51 L73,61 C73,63 72,64 70,64 L38,64 C36,64 35,63 35,61 L35,51 C35,49 36,47 38,47 Z M39,71 A4,4 0,1 0,47 71 A4,4 0,1 0,39 71 M61,71 A4,4 0,1 0,69 71 A4,4 0,1 0,61 71" />
-    <path
-        android:pathData="M42,81 L36,87 M66,81 L72,87 M39,85 L69,85"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-</vector>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MonochromeLauncherIcon">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_station_alarm_foreground" />
+</adaptive-icon>

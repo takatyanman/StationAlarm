@@ -4,30 +4,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material.Colors
 import androidx.wear.compose.material.MaterialTheme
+import kotlin.math.roundToInt
 
-// JR Green Color Palette - 山手線をイメージ
-val JRGreen = Color(0xFF00A651)
-val JRGreenLight = Color(0xFF4DD97E)
-val JRGreenDark = Color(0xFF007A3D)
+// OLED画面で明るく見える、少し青みを含んだグリーン
+val JRGreen = Color(0xFF35D07F)
+val JRGreenLight = Color(0xFF74E6A5)
+val JRGreenDark = Color(0xFF17945A)
 
 // Railway Blue - アクセントカラー
-val RailwayBlue = Color(0xFF0066B3)
-val RailwayBlueLight = Color(0xFF4D9FD9)
+val RailwayBlue = Color(0xFF54A8FF)
+val RailwayBlueLight = Color(0xFF89C5FF)
 
 // Status Colors - 距離に応じた色変化用
-val DistanceFar = Color(0xFF0066B3)      // 青 - 遠い
-val DistanceMedium = Color(0xFF00A651)   // 緑 - 中間
-val DistanceNear = Color(0xFFFFA500)     // オレンジ - 近い
-val DistanceVeryNear = Color(0xFFE94560) // 赤 - 非常に近い
+val DistanceFar = Color(0xFF54A8FF)      // 青 - 遠い
+val DistanceMedium = Color(0xFF35D07F)   // 緑 - 中間
+val DistanceNear = Color(0xFFFFB347)     // オレンジ - 近い
+val DistanceVeryNear = Color(0xFFFF5A6F) // 赤 - 非常に近い
 
 // Background Colors
-val DarkBackground = Color(0xFF1A1A2E)
-val DarkSurface = Color(0xFF16213E)
-val DarkSurfaceVariant = Color(0xFF1F3460)
+val DarkBackground = Color(0xFF070B12)
+val DarkSurface = Color(0xFF111A24)
+val DarkSurfaceVariant = Color(0xFF1B2A38)
 
 // Text Colors
-val TextPrimary = Color(0xFFE8E8E8)
-val TextSecondary = Color(0xFFB0B0B0)
+val TextPrimary = Color(0xFFF3F7FA)
+val TextSecondary = Color(0xFF9FB0BE)
 
 private val StationAlarmColors = Colors(
     primary = JRGreen,
@@ -95,4 +96,36 @@ fun getDistanceBand(distance: Float, threshold: Int): DistanceBand {
 fun calculateArrivalProgress(distance: Float, threshold: Int): Float {
     val safeThreshold = threshold.coerceAtLeast(1).toFloat()
     return ((safeThreshold * 2f - distance) / safeThreshold).coerceIn(0f, 1f)
+}
+
+data class DistanceDisplay(
+    val value: String,
+    val unit: String
+)
+
+/**
+ * 丸型画面で桁あふれしないよう、遠距離はkm表記へ変換する。
+ */
+fun formatDistance(distance: Float?): DistanceDisplay {
+    if (distance == null || !distance.isFinite() || distance < 0f) {
+        return DistanceDisplay(value = "---", unit = "m")
+    }
+
+    return when {
+        distance >= 10_000f -> DistanceDisplay(
+            value = (distance / 1_000f).roundToInt().toString(),
+            unit = "km"
+        )
+        distance >= 1_000f -> {
+            val tenths = (distance / 100f).roundToInt()
+            DistanceDisplay(
+                value = "${tenths / 10}.${tenths % 10}",
+                unit = "km"
+            )
+        }
+        else -> DistanceDisplay(
+            value = distance.roundToInt().toString(),
+            unit = "m"
+        )
+    }
 }
