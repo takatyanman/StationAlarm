@@ -17,6 +17,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+build_output*.txt
+/.idea/vcs.xml
 
 # Claude Code workspace
 /.claude/
